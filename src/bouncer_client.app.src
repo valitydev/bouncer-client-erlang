@@ -1,0 +1,21 @@
+{application, bouncer_client, [
+    {description, "Bouncer service client"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {applications, [
+        kernel,
+        stdlib,
+        genlib,
+        bouncer_proto,
+        org_management_proto,
+        scoper,
+        woody
+    ]},
+    {env, []},
+    {modules, []},
+    {maintainers, [
+        ""
+    ]},
+    {licenses, []},
+    {links, []}
+]}.
