@@ -15,11 +15,11 @@
 -export([end_per_testcase/2]).
 
 -export([empty_judge/1]).
--export([validate_default_user_fragment/1]).
 -export([validate_user_fragment/1]).
 -export([validate_env_fragment/1]).
 -export([validate_auth_fragment/1]).
 -export([validate_requester_fragment/1]).
+-export([validate_complex_fragment/1]).
 -export([validate_remote_user_fragment/1]).
 
 -type test_case_name() :: atom().
@@ -39,11 +39,11 @@ groups() ->
     [
         {default, [], [
             empty_judge,
-            validate_default_user_fragment,
             validate_user_fragment,
             validate_env_fragment,
             validate_auth_fragment,
             validate_requester_fragment,
+            validate_complex_fragment,
             validate_remote_user_fragment
         ]}
     ].
@@ -105,37 +105,17 @@ empty_judge(C) ->
     WoodyContext = woody_context:new(),
     allowed = bouncer_client:judge(?RULESET_ID, #{}, WoodyContext).
 
--spec validate_default_user_fragment(config()) -> _.
-validate_default_user_fragment(C) ->
-    UserID = <<"someUser">>,
-    mock_services(
-        [
-            {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
-                case get_user_id(Fragments) of
-                    UserID ->
-                        {ok, #bdcs_Judgement{resolution = allowed}};
-                    _ ->
-                        {ok, #bdcs_Judgement{resolution = forbidden}}
-                end
-            end}
-        ],
-        C
-    ),
-    WoodyContext = woody_context:new(),
-    allowed = bouncer_client:judge(
-        ?RULESET_ID,
-        #{fragments => #{<<"user">> => bouncer_context_helpers:make_default_user_context_fragment(UserID)}},
-        WoodyContext
-    ).
-
 -spec validate_user_fragment(config()) -> _.
 validate_user_fragment(C) ->
     UserID = <<"someUser">>,
+    UserRealm = <<"external">>,
     mock_services(
         [
             {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
-                case get_user_id(Fragments) of
-                    UserID ->
+                case get_fragment(<<"user">>, Fragments) of
+                    #bctx_v1_ContextFragment{
+                        user = #bctx_v1_User{id = UserID, realm = #bctx_v1_Entity{id = UserRealm}}
+                    } ->
                         {ok, #bdcs_Judgement{resolution = allowed}};
                     _ ->
                         {ok, #bdcs_Judgement{resolution = forbidden}}
@@ -147,7 +127,14 @@ validate_user_fragment(C) ->
     WoodyContext = woody_context:new(),
     allowed = bouncer_client:judge(
         ?RULESET_ID,
-        #{fragments => #{<<"user">> => bouncer_context_helpers:make_user_context_fragment(#{id => UserID})}},
+        #{
+            fragments => #{
+                <<"user">> => bouncer_context_helpers:make_user_fragment(#{
+                    id => UserID,
+                    realm => #{id => UserRealm}
+                })
+            }
+        },
         WoodyContext
     ).
 
@@ -170,7 +157,7 @@ validate_env_fragment(C) ->
     WoodyContext = woody_context:new(),
     allowed = bouncer_client:judge(
         ?RULESET_ID,
-        #{fragments => #{<<"env">> => bouncer_context_helpers:make_env_context_fragment(#{now => Time})}},
+        #{fragments => #{<<"env">> => bouncer_context_helpers:make_env_fragment(#{now => Time})}},
         WoodyContext
     ).
 
@@ -193,7 +180,7 @@ validate_auth_fragment(C) ->
     WoodyContext = woody_context:new(),
     allowed = bouncer_client:judge(
         ?RULESET_ID,
-        #{fragments => #{<<"auth">> => bouncer_context_helpers:make_auth_context_fragment(#{method => Method})}},
+        #{fragments => #{<<"auth">> => bouncer_context_helpers:make_auth_fragment(#{method => Method})}},
         WoodyContext
     ).
 
@@ -221,7 +208,48 @@ validate_requester_fragment(C) ->
     WoodyContext = woody_context:new(),
     allowed = bouncer_client:judge(
         ?RULESET_ID,
-        #{fragments => #{<<"requester">> => bouncer_context_helpers:make_requester_context_fragment(#{ip => IP})}},
+        #{fragments => #{<<"requester">> => bouncer_context_helpers:make_requester_fragment(#{ip => IP})}},
+        WoodyContext
+    ).
+
+-spec validate_complex_fragment(config()) -> _.
+validate_complex_fragment(C) ->
+    mock_services(
+        [
+            {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
+                case Fragments of
+                    #bdcs_Context{fragments = #{<<"complex">> := Fragment}} ->
+                        case decode_fragment(Fragment) of
+                            #bctx_v1_ContextFragment{
+                                env = #bctx_v1_Environment{},
+                                auth = #bctx_v1_Auth{},
+                                user = #bctx_v1_User{}
+                            } ->
+                                {ok, #bdcs_Judgement{resolution = allowed}};
+                            _ ->
+                                {ok, #bdcs_Judgement{resolution = forbidden}}
+                        end;
+                    _ ->
+                        {ok, #bdcs_Judgement{resolution = forbidden}}
+                end
+            end}
+        ],
+        C
+    ),
+    WoodyContext = woody_context:new(),
+    ComplexFragment =
+        bouncer_context_helpers:add_user(
+            #{id => <<"USER">>, realm => #{id => <<"external">>}, email => <<"user@example.org">>},
+            bouncer_context_helpers:add_auth(
+                #{method => <<"METHOD">>},
+                bouncer_context_helpers:make_env_fragment(
+                    #{now => genlib_rfc3339:format(genlib_time:unow(), second)}
+                )
+            )
+        ),
+    allowed = bouncer_client:judge(
+        ?RULESET_ID,
+        #{fragments => #{<<"complex">> => ComplexFragment}},
         WoodyContext
     ).
 
@@ -250,20 +278,15 @@ validate_remote_user_fragment(C) ->
         C
     ),
     WoodyContext = woody_context:new(),
-    {ok, EncodedUserFragment} = bouncer_context_helpers:get_user_context_fragment(UserID, WoodyContext),
+    {ok, EncodedUserFragment} = bouncer_context_helpers:get_user_orgs_fragment(UserID, WoodyContext),
     allowed = bouncer_client:judge(?RULESET_ID, #{fragments => #{<<"user">> => EncodedUserFragment}}, WoodyContext).
 
 %%
 
 get_ip(#bdcs_Context{
-    fragments = #{
-        <<"requester">> := #bctx_ContextFragment{
-            type = v1_thrift_binary,
-            content = Fragment
-        }
-    }
+    fragments = #{<<"requester">> := Fragment}
 }) ->
-    case decode(Fragment) of
+    case decode_fragment(Fragment) of
         {error, _} = Error ->
             error(Error);
         #bctx_v1_ContextFragment{requester = #bctx_v1_Requester{ip = IP}} ->
@@ -271,14 +294,9 @@ get_ip(#bdcs_Context{
     end.
 
 get_auth_method(#bdcs_Context{
-    fragments = #{
-        <<"auth">> := #bctx_ContextFragment{
-            type = v1_thrift_binary,
-            content = Fragment
-        }
-    }
+    fragments = #{<<"auth">> := Fragment}
 }) ->
-    case decode(Fragment) of
+    case decode_fragment(Fragment) of
         {error, _} = Error ->
             error(Error);
         #bctx_v1_ContextFragment{auth = #bctx_v1_Auth{method = Method}} ->
@@ -286,14 +304,9 @@ get_auth_method(#bdcs_Context{
     end.
 
 get_time(#bdcs_Context{
-    fragments = #{
-        <<"env">> := #bctx_ContextFragment{
-            type = v1_thrift_binary,
-            content = Fragment
-        }
-    }
+    fragments = #{<<"env">> := Fragment}
 }) ->
-    case decode(Fragment) of
+    case decode_fragment(Fragment) of
         {error, _} = Error ->
             error(Error);
         #bctx_v1_ContextFragment{env = #bctx_v1_Environment{now = Time}} ->
@@ -301,21 +314,29 @@ get_time(#bdcs_Context{
     end.
 
 get_user_id(#bdcs_Context{
-    fragments = #{
-        <<"user">> := #bctx_ContextFragment{
-            type = v1_thrift_binary,
-            content = Fragment
-        }
-    }
+    fragments = #{<<"user">> := Fragment}
 }) ->
-    case decode(Fragment) of
+    case decode_fragment(Fragment) of
         {error, _} = Error ->
             error(Error);
         #bctx_v1_ContextFragment{user = #bctx_v1_User{id = UserID}} ->
             UserID
     end.
 
-decode(Content) ->
+get_fragment(ID, #bdcs_Context{
+    fragments = Fragments
+}) ->
+    case decode_fragment(maps:get(ID, Fragments)) of
+        {error, _} = Error ->
+            error(Error);
+        Fragment = #bctx_v1_ContextFragment{} ->
+            Fragment
+    end.
+
+decode_fragment(#bctx_ContextFragment{type = v1_thrift_binary, content = Content}) ->
+    decode_fragment_content(Content).
+
+decode_fragment_content(Content) ->
     Type = {struct, struct, {bouncer_context_v1_thrift, 'ContextFragment'}},
     Codec = thrift_strict_binary_codec:new(Content),
     case thrift_strict_binary_codec:read(Codec, Type) of
