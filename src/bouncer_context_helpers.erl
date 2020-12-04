@@ -20,7 +20,7 @@
 -type method() :: binary().
 -type email() :: binary().
 -type timestamp() :: binary().
--type ip() :: string().
+-type ip() :: inet:ip_address() | string() | binary().
 -type context_fragment() :: bouncer_context_v1_thrift:'ContextFragment'().
 -type woody_context() :: woody_context:ctx().
 
@@ -248,7 +248,9 @@ maybe_marshal_user_role(Role) ->
         )
     }.
 
+maybe_marshal_ip(IP) when is_tuple(IP) ->
+    list_to_binary(inet:ntoa(IP));
+maybe_marshal_ip(IP) when is_list(IP) ->
+    list_to_binary(IP);
 maybe_marshal_ip(undefined) ->
-    undefined;
-maybe_marshal_ip(IP) ->
-    list_to_binary(IP).
+    undefined.

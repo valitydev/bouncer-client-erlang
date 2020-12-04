@@ -7,16 +7,18 @@
 
 -export([judge/3]).
 
+-export([bake_context_fragment/1]).
+
 %%
 
 -type woody_context() :: woody_context:ctx().
 
 -type context_fragment_id() :: binary().
 -type ruleset_id() :: binary().
--type encoded_bouncer_fragment() :: bouncer_context_thrift:'ContextFragment'().
+-type encoded_context_fragment() :: bouncer_context_thrift:'ContextFragment'().
 -type context_fragment() ::
     bouncer_context_helpers:context_fragment()
-    | {encoded_fragment, encoded_bouncer_fragment()}.
+    | {encoded_fragment, encoded_context_fragment()}.
 
 -type judge_context() :: #{
     fragments => #{context_fragment_id() => context_fragment()}
@@ -30,6 +32,7 @@
 -export_type([judgement/0]).
 -export_type([judge_context/0]).
 -export_type([context_fragment/0]).
+-export_type([encoded_context_fragment/0]).
 
 -spec judge(ruleset_id(), judge_context(), woody_context()) -> judgement().
 judge(RulesetID, JudgeContext, WoodyContext) ->
@@ -71,12 +74,7 @@ collect_fragments(_, Context) ->
 collect_fragments_(FragmentID, {encoded_fragment, EncodedFragment}, Acc0) ->
     Acc0#{FragmentID => EncodedFragment};
 collect_fragments_(FragmentID, ContextFragment = #bctx_v1_ContextFragment{}, Acc0) ->
-    Acc0#{
-        FragmentID => #bctx_ContextFragment{
-            type = v1_thrift_binary,
-            content = encode_context_fragment(ContextFragment)
-        }
-    }.
+    collect_fragments_(FragmentID, bake_context_fragment(ContextFragment), Acc0).
 
 %%
 
@@ -86,6 +84,14 @@ parse_judgement(#bdcs_Judgement{resolution = forbidden}) ->
     forbidden.
 
 %%
+
+-spec bake_context_fragment(bouncer_context_helpers:context_fragment()) ->
+    {encoded_fragment, encoded_context_fragment()}.
+bake_context_fragment(ContextFragment) ->
+    {encoded_fragment, #bctx_ContextFragment{
+        type = v1_thrift_binary,
+        content = encode_context_fragment(ContextFragment)
+    }}.
 
 encode_context_fragment(ContextFragment) ->
     Type = {struct, struct, {bouncer_context_v1_thrift, 'ContextFragment'}},
