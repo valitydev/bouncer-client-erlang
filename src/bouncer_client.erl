@@ -24,7 +24,7 @@
     fragments => #{context_fragment_id() => context_fragment()}
 }.
 
--type judgement() :: allowed | forbidden.
+-type judgement() :: allowed | forbidden | {restricted, bouncer_restriction_thrift:'Restrictions'()}.
 
 -type service_name() :: atom().
 
@@ -78,10 +78,12 @@ collect_fragments_(FragmentID, ContextFragment = #bctx_v1_ContextFragment{}, Acc
 
 %%
 
-parse_judgement(#bdcs_Judgement{resolution = allowed}) ->
+parse_judgement(#bdcs_Judgement{resolution = {allowed, #bdcs_ResolutionAllowed{}}}) ->
     allowed;
-parse_judgement(#bdcs_Judgement{resolution = forbidden}) ->
-    forbidden.
+parse_judgement(#bdcs_Judgement{resolution = {forbidden, #bdcs_ResolutionForbidden{}}}) ->
+    forbidden;
+parse_judgement(#bdcs_Judgement{resolution = {restricted, #bdcs_ResolutionRestricted{restrictions = Restrictions}}}) ->
+    {restricted, Restrictions}.
 
 %%
 
