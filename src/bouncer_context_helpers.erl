@@ -1,6 +1,5 @@
 -module(bouncer_context_helpers).
 
--include_lib("bouncer_proto/include/bouncer_decisions_thrift.hrl").
 -include_lib("bouncer_proto/include/bouncer_context_v1_thrift.hrl").
 -include_lib("bouncer_proto/include/bouncer_context_thrift.hrl").
 
@@ -151,7 +150,8 @@ add_requester(Params, ContextFragment = #bctx_v1_ContextFragment{requester = und
         }
     }.
 
--spec get_user_orgs_fragment(id(), woody_context()) -> {ok, context_fragment()} | {error, {user, notfound}}.
+-spec get_user_orgs_fragment(_UserID :: binary(), woody_context()) ->
+    {ok, bouncer_client:context_fragment()} | {error, {user, notfound}}.
 get_user_orgs_fragment(UserID, WoodyContext) ->
     ServiceName = org_management,
     case bouncer_client_woody:call(ServiceName, 'GetUserContext', {UserID}, WoodyContext) of
@@ -161,9 +161,17 @@ get_user_orgs_fragment(UserID, WoodyContext) ->
             {error, {user, notfound}}
     end.
 
-%%
+%% As taken from org_management_proto/include/orgmgmt_context_thrift.hrl, please keep in sync:
+%% struct 'ContextFragment'
+%% -record('bctx_ContextFragment', {
+%%     'type' :: atom(),
+%%     'content' :: binary() | undefined
+%% }).
 
-convert_fragment(org_management, {bctx_ContextFragment, Type = v1_thrift_binary, Content}) when is_binary(Content) ->
+convert_fragment(
+    org_management,
+    {bctx_ContextFragment, Type = v1_thrift_binary, Content}
+) when is_binary(Content) ->
     #bctx_ContextFragment{
         type = Type,
         content = Content
