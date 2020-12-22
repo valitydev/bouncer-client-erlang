@@ -45,7 +45,9 @@
 -type auth_scope() :: #{
     party => entity(),
     shop => entity(),
-    invoice => entity()
+    invoice => entity(),
+    invoice_template => entity(),
+    customer => entity()
 }.
 
 -type user_params() :: #{
@@ -208,22 +210,21 @@ maybe_marshal_entity(Entity) ->
 maybe_marshal_auth_scopes(undefined) ->
     undefined;
 maybe_marshal_auth_scopes(Scopes) ->
-    lists:map(fun(Scope) -> maybe_marshal_auth_scope(Scope) end, Scopes).
+    ordsets:from_list(lists:map(fun(Scope) -> maybe_marshal_auth_scope(Scope) end, Scopes)).
 
 maybe_marshal_auth_scope(Scope) ->
-    PartyEntity = maybe_get_param(party, Scope),
-    ShopEntity = maybe_get_param(shop, Scope),
-    InvoiceEntity = maybe_get_param(invoice, Scope),
     #bctx_v1_AuthScope{
-        party = maybe_add_param(maybe_marshal_entity(PartyEntity), PartyEntity),
-        shop = maybe_add_param(maybe_marshal_entity(ShopEntity), ShopEntity),
-        invoice = maybe_add_param(maybe_marshal_entity(InvoiceEntity), InvoiceEntity)
+        party = maybe_marshal_entity(maybe_get_param(party, Scope)),
+        shop = maybe_marshal_entity(maybe_get_param(shop, Scope)),
+        invoice = maybe_marshal_entity(maybe_get_param(invoice, Scope)),
+        invoice_template = maybe_marshal_entity(maybe_get_param(invoice_template, Scope)),
+        customer = maybe_marshal_entity(maybe_get_param(customer, Scope))
     }.
 
 maybe_marshal_user_orgs(undefined) ->
     undefined;
 maybe_marshal_user_orgs(Orgs) ->
-    lists:map(fun(Org) -> maybe_marshal_user_org(Org) end, Orgs).
+    ordsets:from_list(lists:map(fun(Org) -> maybe_marshal_user_org(Org) end, Orgs)).
 
 maybe_marshal_user_org(Org) ->
     ID = maybe_get_param(id, Org),
@@ -239,7 +240,7 @@ maybe_marshal_user_org(Org) ->
 maybe_marshal_user_roles(undefined) ->
     undefined;
 maybe_marshal_user_roles(Roles) ->
-    lists:map(fun(Role) -> maybe_marshal_user_role(Role) end, Roles).
+    ordsets:from_list(lists:map(fun(Role) -> maybe_marshal_user_role(Role) end, Roles)).
 
 maybe_marshal_user_role(Role) ->
     ID = maybe_get_param(id, Role),

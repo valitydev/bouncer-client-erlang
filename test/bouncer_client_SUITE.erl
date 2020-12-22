@@ -18,6 +18,7 @@
 -export([validate_user_fragment/1]).
 -export([validate_env_fragment/1]).
 -export([validate_auth_fragment/1]).
+-export([validate_auth_fragment_scope/1]).
 -export([validate_requester_fragment/1]).
 -export([validate_complex_fragment/1]).
 -export([validate_remote_user_fragment/1]).
@@ -42,6 +43,7 @@ groups() ->
             validate_user_fragment,
             validate_env_fragment,
             validate_auth_fragment,
+            validate_auth_fragment_scope,
             validate_requester_fragment,
             validate_complex_fragment,
             validate_remote_user_fragment
@@ -207,6 +209,59 @@ validate_auth_fragment(C) ->
         WoodyContext
     ).
 
+-spec validate_auth_fragment_scope(config()) -> _.
+validate_auth_fragment_scope(C) ->
+    Method = <<"Blep">>,
+    PartyID = <<"PARTY">>,
+    CustomerID = <<"🎎"/utf8>>,
+    InvoiceTemplateID = <<"🎷"/utf8>>,
+    mock_services(
+        [
+            {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
+                Auth = get_fragment(<<"auth">>, Fragments),
+                ?assertEqual(
+                    #bctx_v1_ContextFragment{
+                        auth = #bctx_v1_Auth{
+                            method = Method,
+                            scope = [
+                                #bctx_v1_AuthScope{
+                                    invoice_template = #bctx_v1_Entity{id = InvoiceTemplateID},
+                                    customer = #bctx_v1_Entity{id = CustomerID}
+                                },
+                                #bctx_v1_AuthScope{party = #bctx_v1_Entity{id = PartyID}}
+                            ]
+                        }
+                    },
+                    Auth
+                ),
+                {ok, #bdcs_Judgement{
+                    resolution = {allowed, #bdcs_ResolutionAllowed{}},
+                    resolution_legacy = allowed
+                }}
+            end}
+        ],
+        C
+    ),
+    WoodyContext = woody_context:new(),
+    allowed = bouncer_client:judge(
+        ?RULESET_ID,
+        #{
+            fragments => #{
+                <<"auth">> => bouncer_context_helpers:make_auth_fragment(#{
+                    method => Method,
+                    scope => [
+                        #{party => #{id => PartyID}},
+                        #{
+                            customer => #{id => CustomerID},
+                            invoice_template => #{id => InvoiceTemplateID}
+                        }
+                    ]
+                })
+            }
+        },
+        WoodyContext
+    ).
+
 -spec validate_requester_fragment(config()) -> _.
 validate_requester_fragment(C) ->
     IP = "someIP",
@@ -333,55 +388,37 @@ validate_remote_user_fragment(C) ->
 get_ip(#bdcs_Context{
     fragments = #{<<"requester">> := Fragment}
 }) ->
-    case decode_fragment(Fragment) of
-        {error, _} = Error ->
-            error(Error);
-        #bctx_v1_ContextFragment{requester = #bctx_v1_Requester{ip = IP}} ->
-            IP
-    end.
+    #bctx_v1_ContextFragment{requester = #bctx_v1_Requester{ip = IP}} = decode_fragment(Fragment),
+    IP.
 
 get_auth_method(#bdcs_Context{
     fragments = #{<<"auth">> := Fragment}
 }) ->
-    case decode_fragment(Fragment) of
-        {error, _} = Error ->
-            error(Error);
-        #bctx_v1_ContextFragment{auth = #bctx_v1_Auth{method = Method}} ->
-            Method
-    end.
+    #bctx_v1_ContextFragment{auth = #bctx_v1_Auth{method = Method}} = decode_fragment(Fragment),
+    Method.
 
 get_time(#bdcs_Context{
     fragments = #{<<"env">> := Fragment}
 }) ->
-    case decode_fragment(Fragment) of
-        {error, _} = Error ->
-            error(Error);
-        #bctx_v1_ContextFragment{env = #bctx_v1_Environment{now = Time}} ->
-            Time
-    end.
+    #bctx_v1_ContextFragment{env = #bctx_v1_Environment{now = Time}} = decode_fragment(Fragment),
+    Time.
 
 get_user_id(#bdcs_Context{
     fragments = #{<<"user">> := Fragment}
 }) ->
-    case decode_fragment(Fragment) of
-        {error, _} = Error ->
-            error(Error);
-        #bctx_v1_ContextFragment{user = #bctx_v1_User{id = UserID}} ->
-            UserID
-    end.
+    #bctx_v1_ContextFragment{user = #bctx_v1_User{id = UserID}} = decode_fragment(Fragment),
+    UserID.
 
-get_fragment(ID, #bdcs_Context{
-    fragments = Fragments
-}) ->
-    case decode_fragment(maps:get(ID, Fragments)) of
-        {error, _} = Error ->
-            error(Error);
-        Fragment = #bctx_v1_ContextFragment{} ->
-            Fragment
-    end.
+get_fragment(ID, #bdcs_Context{fragments = Fragments}) ->
+    decode_fragment(maps:get(ID, Fragments)).
 
 decode_fragment(#bctx_ContextFragment{type = v1_thrift_binary, content = Content}) ->
-    decode_fragment_content(Content).
+    case decode_fragment_content(Content) of
+        Fragment = #bctx_v1_ContextFragment{} ->
+            Fragment;
+        {error, Reason} ->
+            error(Reason)
+    end.
 
 decode_fragment_content(Content) ->
     Type = {struct, struct, {bouncer_context_v1_thrift, 'ContextFragment'}},
