@@ -39,7 +39,12 @@
 -type auth_params() :: #{
     method := method(),
     scope => [auth_scope()],
-    expiration => timestamp()
+    expiration => timestamp(),
+    token => token()
+}.
+
+-type token() :: #{
+    id => id()
 }.
 
 -type auth_scope() :: #{
@@ -112,11 +117,13 @@ add_auth(Params, ContextFragment = #bctx_v1_ContextFragment{auth = undefined}) -
     Method = get_param(method, Params),
     Scope = maybe_get_param(scope, Params),
     Expiration = maybe_get_param(expiration, Params),
+    Token = maybe_get_param(token, Params),
     ContextFragment#bctx_v1_ContextFragment{
         auth = #bctx_v1_Auth{
             method = Method,
             scope = maybe_marshal_auth_scopes(Scope),
-            expiration = Expiration
+            expiration = Expiration,
+            token = maybe(Token, fun marshal_token/1)
         }
     }.
 
@@ -182,6 +189,11 @@ convert_fragment(
 get_param(Key, Map = #{}) ->
     maps:get(Key, Map).
 
+maybe(undefined, _Fun) ->
+    undefined;
+maybe(V, Fun) ->
+    Fun(V).
+
 maybe_get_param(_Key, undefined) ->
     undefined;
 maybe_get_param(Key, Map) ->
@@ -206,6 +218,9 @@ maybe_marshal_entity(undefined) ->
 maybe_marshal_entity(Entity) ->
     EntityID = maybe_get_param(id, Entity),
     #bctx_v1_Entity{id = EntityID}.
+
+marshal_token(Token) ->
+    #bctx_v1_Token{id = maybe_get_param(id, Token)}.
 
 maybe_marshal_auth_scopes(undefined) ->
     undefined;
