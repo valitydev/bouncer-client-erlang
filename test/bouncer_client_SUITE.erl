@@ -113,23 +113,33 @@ empty_judge(C) ->
 
 -spec validate_user_fragment(config()) -> _.
 validate_user_fragment(C) ->
-    UserID = <<"someUser">>,
-    UserRealm = <<"external">>,
+    UserID = <<"somebody">>,
+    UserRealm = <<"once">>,
+    OrgID = <<"told">>,
+    PartyID = <<"me">>,
     mock_services(
         [
             {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
-                case get_fragment(<<"user">>, Fragments) of
+                Auth = get_fragment(<<"user">>, Fragments),
+                ?assertEqual(
                     #bctx_v1_ContextFragment{
-                        user = #bctx_v1_User{id = UserID, realm = #bctx_v1_Entity{id = UserRealm}}
-                    } ->
-                        {ok, #bdcs_Judgement{
-                            resolution = {allowed, #bdcs_ResolutionAllowed{}}
-                        }};
-                    _ ->
-                        {ok, #bdcs_Judgement{
-                            resolution = {forbidden, #bdcs_ResolutionForbidden{}}
-                        }}
-                end
+                        user = #bctx_v1_User{
+                            id = UserID,
+                            realm = #bctx_v1_Entity{id = UserRealm},
+                            orgs = [
+                                #bctx_v1_Organization{
+                                    id = OrgID,
+                                    party = #bctx_v1_Entity{id = PartyID},
+                                    owner = #bctx_v1_Entity{id = UserID}
+                                }
+                            ]
+                        }
+                    },
+                    Auth
+                ),
+                {ok, #bdcs_Judgement{
+                    resolution = {allowed, #bdcs_ResolutionAllowed{}}
+                }}
             end}
         ],
         C
@@ -141,7 +151,8 @@ validate_user_fragment(C) ->
             fragments => #{
                 <<"user">> => bouncer_context_helpers:make_user_fragment(#{
                     id => UserID,
-                    realm => #{id => UserRealm}
+                    realm => #{id => UserRealm},
+                    orgs => [#{id => OrgID, party => #{id => PartyID}, owner => #{id => UserID}}]
                 })
             }
         },

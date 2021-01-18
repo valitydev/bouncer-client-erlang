@@ -65,6 +65,7 @@
 -type user_org() :: #{
     id => id(),
     owner => entity(),
+    party => entity(),
     roles => [user_role()]
 }.
 
@@ -244,12 +245,13 @@ maybe_marshal_user_orgs(Orgs) ->
 maybe_marshal_user_org(Org) ->
     ID = maybe_get_param(id, Org),
     OwnerEntity = maybe_get_param(owner, Org),
+    PartyEntity = maybe_get_param(party, Org),
     Roles = maybe_get_param(roles, Org),
-
     #bctx_v1_Organization{
         id = ID,
-        owner = maybe_add_param(maybe_marshal_entity(OwnerEntity), OwnerEntity),
-        roles = maybe_add_param(maybe_marshal_user_roles(Roles), Roles)
+        owner = maybe_marshal_entity(OwnerEntity),
+        party = maybe_marshal_entity(PartyEntity),
+        roles = maybe_marshal_user_roles(Roles)
     }.
 
 maybe_marshal_user_roles(undefined) ->
