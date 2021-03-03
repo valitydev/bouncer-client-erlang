@@ -7,36 +7,47 @@
 -define(DEFAULT_DEADLINE, 5000).
 
 %%
--type service_name() :: atom().
 
--spec call(service_name(), woody:func(), woody:args(), woody_context:ctx()) -> woody:result().
+-type service_name() ::
+    org_management
+    | bouncer.
+
+-type client_config() :: #{
+    url := woody:url(),
+    timeout => non_neg_integer(),
+    retries => #{woody:func() | '_' => genlib_retry:strategy()}
+}.
+
+-type context() :: woody_context:ctx().
+
+-spec call(service_name(), woody:func(), woody:args(), context()) -> woody:result().
 call(ServiceName, Function, Args, Context) ->
     EventHandler = scoper_woody_event_handler,
     call(ServiceName, Function, Args, Context, EventHandler).
 
--spec call(service_name(), woody:func(), woody:args(), woody_context:ctx(), woody:ev_handler()) -> woody:result().
+-spec call(service_name(), woody:func(), woody:args(), context(), woody:ev_handler()) -> woody:result().
 call(ServiceName, Function, Args, Context0, EventHandler) ->
-    Deadline = get_service_deadline(ServiceName),
-    Context1 = set_deadline(Deadline, Context0),
-    Retry = get_service_retry(ServiceName, Function),
-    call(ServiceName, Function, Args, Context1, EventHandler, Retry).
-
-call(ServiceName, Function, Args, Context, EventHandler, Retry) ->
-    Url = get_service_client_url(ServiceName),
+    Config = get_service_client_config(ServiceName),
+    Deadline = get_service_deadline(Config),
+    Context1 = set_deadline(Deadline, set_default_deadline(Context0)),
+    Retry = get_service_retry(Function, Config),
     Service = get_service_modname(ServiceName),
     Request = {Service, Function, Args},
+    Opts = #{
+        url => get_service_client_url(Config),
+        event_handler => EventHandler
+    },
+    call_retry(Request, Context1, Opts, Retry).
+
+call_retry(Request, Context, Opts, Retry) ->
     try
-        woody_client:call(
-            Request,
-            #{url => Url, event_handler => EventHandler},
-            Context
-        )
+        woody_client:call(Request, Opts, Context)
     catch
         error:{woody_error, {_Source, Class, _Details}} = Error when
             Class =:= resource_unavailable orelse Class =:= result_unknown
         ->
             NextRetry = apply_retry_strategy(Retry, Error, Context),
-            call(ServiceName, Function, Args, Context, EventHandler, NextRetry)
+            call_retry(Request, Context, Opts, NextRetry)
     end.
 
 apply_retry_strategy(Retry, Error, Context) ->
@@ -60,12 +71,13 @@ apply_retry_step({wait, Timeout, Retry}, Deadline0, Error) ->
             Retry
     end.
 
+-spec get_service_client_config(service_name()) -> client_config().
 get_service_client_config(ServiceName) ->
     ServiceClients = genlib_app:env(bouncer_client, service_clients, #{}),
     maps:get(ServiceName, ServiceClients, #{}).
 
-get_service_client_url(ServiceName) ->
-    maps:get(url, get_service_client_config(ServiceName), undefined).
+get_service_client_url(ClientConfig) ->
+    maps:get(url, ClientConfig).
 
 -spec get_service_modname(service_name()) -> woody:service().
 get_service_modname(org_management) ->
@@ -73,22 +85,27 @@ get_service_modname(org_management) ->
 get_service_modname(bouncer) ->
     {bouncer_decisions_thrift, 'Arbiter'}.
 
--spec get_service_deadline(service_name()) -> undefined | woody_deadline:deadline().
-get_service_deadline(ServiceName) ->
-    ServiceClient = get_service_client_config(ServiceName),
-    Timeout = maps:get(deadline, ServiceClient, ?DEFAULT_DEADLINE),
-    woody_deadline:from_timeout(Timeout).
+-spec get_service_deadline(client_config()) -> undefined | woody_deadline:deadline().
+get_service_deadline(ClientConfig) ->
+    case maps:get(timeout, ClientConfig, undefined) of
+        undefined -> undefined;
+        Timeout -> woody_deadline:from_timeout(Timeout)
+    end.
 
+set_deadline(undefined, Context) ->
+    Context;
 set_deadline(Deadline, Context) ->
+    woody_context:set_deadline(Deadline, Context).
+
+set_default_deadline(Context) ->
     case woody_context:get_deadline(Context) of
         undefined ->
-            woody_context:set_deadline(Deadline, Context);
+            woody_context:set_deadline(woody_deadline:from_timeout(?DEFAULT_DEADLINE), Context);
         _AlreadySet ->
             Context
     end.
 
-get_service_retry(ServiceName, Function) ->
-    ServiceRetries = genlib_app:env(?APP, service_retries, #{}),
-    FunctionReties = maps:get(ServiceName, ServiceRetries, #{}),
-    DefaultRetry = maps:get('_', FunctionReties, finish),
-    maps:get(Function, FunctionReties, DefaultRetry).
+get_service_retry(Function, ClientConfig) ->
+    FunctionRetries = maps:get(retries, ClientConfig, #{}),
+    DefaultRetry = maps:get('_', FunctionRetries, finish),
+    maps:get(Function, FunctionRetries, DefaultRetry).

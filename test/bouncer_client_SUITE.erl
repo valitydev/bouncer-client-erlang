@@ -15,6 +15,8 @@
 -export([end_per_testcase/2]).
 
 -export([empty_judge/1]).
+-export([follows_retries/1]).
+-export([follows_timeout/1]).
 -export([validate_user_fragment/1]).
 -export([validate_env_fragment/1]).
 -export([validate_auth_fragment/1]).
@@ -40,6 +42,8 @@ groups() ->
     [
         {default, [], [
             empty_judge,
+            follows_retries,
+            follows_timeout,
             validate_user_fragment,
             validate_env_fragment,
             validate_auth_fragment,
@@ -52,6 +56,11 @@ groups() ->
 
 -type config() :: [{atom(), any()}].
 
+-define(TIMEOUT, 1000).
+-define(RETRY_NUM, 3).
+-define(RETRY_TIMEOUT, 100).
+-define(RETRY_STRATEGY, {linear, ?RETRY_NUM, ?RETRY_TIMEOUT}).
+
 -spec init_per_suite(config()) -> config().
 init_per_suite(Config) ->
     Apps =
@@ -59,8 +68,9 @@ init_per_suite(Config) ->
             {service_clients, #{
                 bouncer => #{
                     url => <<"http://bouncer:8022/">>,
+                    timeout => ?TIMEOUT,
                     retries => #{
-                        'Judge' => {linear, 3, 1000},
+                        'Judge' => ?RETRY_STRATEGY,
                         '_' => finish
                     }
                 },
@@ -72,7 +82,7 @@ init_per_suite(Config) ->
                         % default value is 'finish'
                         % for more info look genlib_retry :: strategy()
                         % https://github.com/rbkmoney/genlib/blob/master/src/genlib_retry.erl#L19
-                        'GetUserContext' => {linear, 3, 1000},
+                        'GetUserContext' => {linear, 3, 100},
                         '_' => finish
                     }
                 }
@@ -110,6 +120,41 @@ empty_judge(C) ->
     ),
     WoodyContext = woody_context:new(),
     allowed = bouncer_client:judge(?RULESET_ID, #{}, WoodyContext).
+
+-spec follows_retries(config()) -> _.
+follows_retries(_C) ->
+    WoodyContext = woody_context:new(),
+    T0 = erlang:monotonic_time(millisecond),
+    ?assertError(
+        {woody_error, {internal, resource_unavailable, _}},
+        bouncer_client:judge(?RULESET_ID, #{}, WoodyContext)
+    ),
+    T1 = erlang:monotonic_time(millisecond),
+    ?assert(T1 - T0 > ?RETRY_NUM * ?RETRY_TIMEOUT),
+    ?assert(T1 - T0 < ?RETRY_NUM * ?RETRY_TIMEOUT * 1.5).
+
+-spec follows_timeout(config()) -> _.
+follows_timeout(C) ->
+    mock_services(
+        [
+            {bouncer, fun('Judge', _) ->
+                ok = timer:sleep(5000),
+                {ok, #bdcs_Judgement{
+                    resolution = {allowed, #bdcs_ResolutionAllowed{}}
+                }}
+            end}
+        ],
+        C
+    ),
+    WoodyContext = woody_context:new(),
+    T0 = erlang:monotonic_time(millisecond),
+    ?assertError(
+        {woody_error, {external, result_unknown, _}},
+        bouncer_client:judge(?RULESET_ID, #{}, WoodyContext)
+    ),
+    T1 = erlang:monotonic_time(millisecond),
+    ?assert(T1 - T0 > ?TIMEOUT),
+    ?assert(T1 - T0 < ?TIMEOUT * 1.5).
 
 -spec validate_user_fragment(config()) -> _.
 validate_user_fragment(C) ->
@@ -368,7 +413,7 @@ validate_remote_user_fragment(C) ->
                         id = UserID
                     }
                 }),
-                {ok, {bctx_ContextFragment, v1_thrift_binary, Content}}
+                {ok, {'bctx_ContextFragment', v1_thrift_binary, Content}}
             end},
             {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
                 case get_user_id(Fragments) of
@@ -475,21 +520,19 @@ set_cfg(Service, Url) ->
 mock_services_(Services, Config) when is_list(Config) ->
     mock_services_(Services, ?config(test_sup, Config));
 mock_services_(Services, SupPid) when is_pid(SupPid) ->
-    Name = lists:map(fun get_service_name/1, Services),
-
-    Port = get_random_port(),
+    ServerRef = {dummy, lists:map(fun get_service_name/1, Services)},
     {ok, IP} = inet:parse_address(?HOST_IP),
     ChildSpec = woody_server:child_spec(
-        {dummy, Name},
-        #{
+        ServerRef,
+        Options = #{
             ip => IP,
-            port => Port,
+            port => 0,
             event_handler => scoper_woody_event_handler,
             handlers => lists:map(fun mock_service_handler/1, Services)
         }
     ),
     {ok, _} = supervisor:start_child(SupPid, ChildSpec),
-
+    {IP, Port} = woody_server:get_addr(ServerRef, Options),
     lists:foldl(
         fun(Service, Acc) ->
             ServiceName = get_service_name(Service),
@@ -516,10 +559,6 @@ get_service_modname(org_management) ->
     {orgmgmt_auth_context_provider_thrift, 'AuthContextProvider'};
 get_service_modname(bouncer) ->
     {bouncer_decisions_thrift, 'Arbiter'}.
-
-% TODO not so failproof, ideally we need to bind socket first and then give to a ranch listener
-get_random_port() ->
-    rand:uniform(32768) + 32767.
 
 make_url(ServiceName, Port) ->
     iolist_to_binary(["http://", ?HOST_NAME, ":", integer_to_list(Port), make_path(ServiceName)]).

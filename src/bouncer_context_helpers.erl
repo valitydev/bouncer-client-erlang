@@ -167,7 +167,7 @@ get_user_orgs_fragment(UserID, WoodyContext) ->
     case bouncer_client_woody:call(ServiceName, 'GetUserContext', {UserID}, WoodyContext) of
         {ok, EncodedFragment} ->
             {ok, {encoded_fragment, convert_fragment(ServiceName, EncodedFragment)}};
-        {exception, {orgmgmt_UserNotFound}} ->
+        {exception, {'orgmgmt_UserNotFound'}} ->
             {error, {user, notfound}}
     end.
 
@@ -180,7 +180,7 @@ get_user_orgs_fragment(UserID, WoodyContext) ->
 
 convert_fragment(
     org_management,
-    {bctx_ContextFragment, Type = v1_thrift_binary, Content}
+    {'bctx_ContextFragment', Type = v1_thrift_binary, Content}
 ) when is_binary(Content) ->
     #bctx_ContextFragment{
         type = Type,

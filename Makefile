@@ -8,7 +8,8 @@ TEMPLATES_PATH := .
 # Name of the service
 SERVICE_NAME := bouncer_client_erlang
 
-BUILD_IMAGE_TAG := 0c638a682f4735a65ef232b81ed872ba494574c3
+BUILD_IMAGE_NAME := build-erlang
+BUILD_IMAGE_TAG := 1aa9b46b343bcf3bf0d4359ceca1a7ab6d577699
 
 CALL_ANYWHERE := \
 	submodules \
@@ -37,7 +38,7 @@ xref:
 	$(REBAR) xref
 
 lint:
-	elvis rock
+	$(REBAR) lint
 
 check_format:
 	$(REBAR) fmt -c
