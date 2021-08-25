@@ -170,12 +170,12 @@ validate_user_fragment(C) ->
                     #bctx_v1_ContextFragment{
                         user = #bctx_v1_User{
                             id = UserID,
-                            realm = #bctx_v1_Entity{id = UserRealm},
+                            realm = #bouncer_base_Entity{id = UserRealm},
                             orgs = [
                                 #bctx_v1_Organization{
                                     id = OrgID,
-                                    party = #bctx_v1_Entity{id = PartyID},
-                                    owner = #bctx_v1_Entity{id = UserID}
+                                    party = #bouncer_base_Entity{id = PartyID},
+                                    owner = #bouncer_base_Entity{id = UserID}
                                 }
                             ]
                         }
@@ -285,10 +285,10 @@ validate_auth_fragment_scope(C) ->
                             method = Method,
                             scope = [
                                 #bctx_v1_AuthScope{
-                                    invoice_template = #bctx_v1_Entity{id = InvoiceTemplateID},
-                                    customer = #bctx_v1_Entity{id = CustomerID}
+                                    invoice_template = #bouncer_base_Entity{id = InvoiceTemplateID},
+                                    customer = #bouncer_base_Entity{id = CustomerID}
                                 },
-                                #bctx_v1_AuthScope{party = #bctx_v1_Entity{id = PartyID}}
+                                #bctx_v1_AuthScope{party = #bouncer_base_Entity{id = PartyID}}
                             ]
                         }
                     },

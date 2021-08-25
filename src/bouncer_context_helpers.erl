@@ -212,13 +212,13 @@ maybe_add_param(Value, _Param) ->
 
 marshal_entity(Entity) ->
     EntityID = get_param(id, Entity),
-    #bctx_v1_Entity{id = EntityID}.
+    #bouncer_base_Entity{id = EntityID}.
 
 maybe_marshal_entity(undefined) ->
     undefined;
 maybe_marshal_entity(Entity) ->
     EntityID = maybe_get_param(id, Entity),
-    #bctx_v1_Entity{id = EntityID}.
+    #bouncer_base_Entity{id = EntityID}.
 
 marshal_token(Token) ->
     #bctx_v1_Token{id = maybe_get_param(id, Token)}.

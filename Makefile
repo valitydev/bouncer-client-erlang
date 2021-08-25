@@ -9,7 +9,7 @@ TEMPLATES_PATH := .
 SERVICE_NAME := bouncer_client_erlang
 
 BUILD_IMAGE_NAME := build-erlang
-BUILD_IMAGE_TAG := 1aa9b46b343bcf3bf0d4359ceca1a7ab6d577699
+BUILD_IMAGE_TAG := aaa79c2d6b597f93f5f8b724eecfc31ec2e2a23b
 
 CALL_ANYWHERE := \
 	submodules \
