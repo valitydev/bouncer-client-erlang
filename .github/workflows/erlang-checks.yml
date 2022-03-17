@@ -15,6 +15,7 @@ jobs:
     outputs:
       otp-version: ${{ steps.otp-version.outputs.version }}
       rebar-version: ${{ steps.rebar-version.outputs.version }}
+      thrift-version: ${{ steps.thrift-version.outputs.version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
