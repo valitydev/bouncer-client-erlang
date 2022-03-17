@@ -23,6 +23,8 @@ jobs:
         run: echo "::set-output name=version::$OTP_VERSION"
       - id: rebar-version
         run: echo "::set-output name=version::$REBAR_VERSION"
+      - id: thrift-version
+        run: echo "::set-output name=version::$THRIFT_VERSION"
 
   run:
     name: Run checks
@@ -31,3 +33,5 @@ jobs:
     with:
       otp-version: ${{ needs.setup.outputs.otp-version }}
       rebar-version: ${{ needs.setup.outputs.rebar-version }}
+      use-thrift: true
+      thrift-version: ${{ needs.setup.outputs.thrift-version }}
