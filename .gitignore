@@ -1,24 +1,13 @@
-# general
-log
+# Build artifacts
 /_build/
-*~
-erl_crash.dump
-.tags*
-*.sublime-*
-
-.DS_Store
-
-# rebar
-/_checkouts/
-
+*.o
 *.beam
+*.plt
 
-# generated
-apps/swag_server/*
-apps/swag_client/*
+# Run artifacts
+erl_crash.dump
+log
 
-# containerization
-\#*
-.\#*
-Dockerfile
-docker-compose.yml
+# make stuff
+/.image.*
+Makefile.env

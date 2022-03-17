@@ -31,7 +31,7 @@
 
 %% tests descriptions
 
--spec all() -> [test_case_name()].
+-spec all() -> [{atom(), test_case_name()} | test_case_name()].
 all() ->
     [
         {group, default}
@@ -92,14 +92,14 @@ init_per_suite(Config) ->
 
 -spec end_per_suite(config()) -> _.
 end_per_suite(Config) ->
-    [application:stop(App) || App <- proplists:get_value(apps, Config)],
+    _ = [application:stop(App) || App <- proplists:get_value(apps, Config)],
     Config.
 
 -spec init_per_testcase(test_case_name(), config()) -> config().
 init_per_testcase(_Name, C) ->
     [{test_sup, start_mocked_service_sup()} | C].
 
--spec end_per_testcase(test_case_name(), config()) -> config().
+-spec end_per_testcase(test_case_name(), config()) -> ok.
 end_per_testcase(_Name, C) ->
     stop_mocked_service_sup(?config(test_sup, C)),
     ok.
@@ -108,7 +108,7 @@ end_per_testcase(_Name, C) ->
 
 -spec empty_judge(config()) -> _.
 empty_judge(C) ->
-    mock_services(
+    _ = mock_services(
         [
             {bouncer, fun('Judge', _) ->
                 {ok, #bdcs_Judgement{
@@ -135,7 +135,7 @@ follows_retries(_C) ->
 
 -spec follows_timeout(config()) -> _.
 follows_timeout(C) ->
-    mock_services(
+    _ = mock_services(
         [
             {bouncer, fun('Judge', _) ->
                 ok = timer:sleep(5000),
@@ -162,7 +162,7 @@ validate_user_fragment(C) ->
     UserRealm = <<"once">>,
     OrgID = <<"told">>,
     PartyID = <<"me">>,
-    mock_services(
+    _ = mock_services(
         [
             {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
                 Auth = get_fragment(<<"user">>, Fragments),
@@ -207,7 +207,7 @@ validate_user_fragment(C) ->
 -spec validate_env_fragment(config()) -> _.
 validate_env_fragment(C) ->
     Time = genlib_rfc3339:format(genlib_time:unow(), second),
-    mock_services(
+    _ = mock_services(
         [
             {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
                 case get_time(Fragments) of
@@ -235,7 +235,7 @@ validate_env_fragment(C) ->
 validate_auth_fragment(C) ->
     Method = <<"someMethod">>,
     TokenID = <<"📟"/utf8>>,
-    mock_services(
+    _ = mock_services(
         [
             {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
                 Auth = get_fragment(<<"auth">>, Fragments),
@@ -275,7 +275,7 @@ validate_auth_fragment_scope(C) ->
     PartyID = <<"PARTY">>,
     CustomerID = <<"🎎"/utf8>>,
     InvoiceTemplateID = <<"🎷"/utf8>>,
-    mock_services(
+    _ = mock_services(
         [
             {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
                 Auth = get_fragment(<<"auth">>, Fragments),
@@ -324,7 +324,7 @@ validate_auth_fragment_scope(C) ->
 -spec validate_requester_fragment(config()) -> _.
 validate_requester_fragment(C) ->
     IP = "someIP",
-    mock_services(
+    _ = mock_services(
         [
             {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
                 case get_ip(Fragments) of
@@ -357,7 +357,7 @@ validate_requester_fragment(C) ->
 
 -spec validate_complex_fragment(config()) -> _.
 validate_complex_fragment(C) ->
-    mock_services(
+    _ = mock_services(
         [
             {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
                 case Fragments of
@@ -405,7 +405,7 @@ validate_complex_fragment(C) ->
 -spec validate_remote_user_fragment(config()) -> _.
 validate_remote_user_fragment(C) ->
     UserID = <<"someUser">>,
-    mock_services(
+    _ = mock_services(
         [
             {org_management, fun('GetUserContext', _) ->
                 Content = encode(#bctx_v1_ContextFragment{
