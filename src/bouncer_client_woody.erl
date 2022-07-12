@@ -3,7 +3,6 @@
 -export([call/4]).
 -export([call/5]).
 
--define(APP, bouncer_client).
 -define(DEFAULT_DEADLINE, 5000).
 
 %%
@@ -81,9 +80,9 @@ get_service_client_url(ClientConfig) ->
 
 -spec get_service_modname(service_name()) -> woody:service().
 get_service_modname(org_management) ->
-    {orgmgmt_auth_context_provider_thrift, 'AuthContextProvider'};
+    {orgmgmt_authctx_provider_thrift, 'AuthContextProvider'};
 get_service_modname(bouncer) ->
-    {bouncer_decisions_thrift, 'Arbiter'}.
+    {bouncer_decision_thrift, 'Arbiter'}.
 
 -spec get_service_deadline(client_config()) -> undefined | woody_deadline:deadline().
 get_service_deadline(ClientConfig) ->

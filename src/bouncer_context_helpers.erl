@@ -1,7 +1,7 @@
 -module(bouncer_context_helpers).
 
--include_lib("bouncer_proto/include/bouncer_context_v1_thrift.hrl").
--include_lib("bouncer_proto/include/bouncer_context_thrift.hrl").
+-include_lib("bouncer_proto/include/bouncer_ctx_v1_thrift.hrl").
+-include_lib("bouncer_proto/include/bouncer_base_thrift.hrl").
 
 -export([empty/0]).
 -export([make_env_fragment/1]).
@@ -20,7 +20,7 @@
 -type email() :: binary().
 -type timestamp() :: binary().
 -type ip() :: inet:ip_address() | string() | binary().
--type context_fragment() :: bouncer_context_v1_thrift:'ContextFragment'().
+-type context_fragment() :: bouncer_ctx_v1_thrift:'ContextFragment'().
 -type woody_context() :: woody_context:ctx().
 
 -type entity() :: #{
@@ -91,21 +91,21 @@
 
 -spec empty() -> context_fragment().
 empty() ->
-    #bctx_v1_ContextFragment{}.
+    #ctx_v1_ContextFragment{}.
 
 -spec make_env_fragment(environment_params()) -> context_fragment().
 make_env_fragment(Params) ->
     add_env(Params, empty()).
 
 -spec add_env(environment_params(), context_fragment()) -> context_fragment().
-add_env(Params, ContextFragment = #bctx_v1_ContextFragment{env = undefined}) ->
+add_env(Params, ContextFragment = #ctx_v1_ContextFragment{env = undefined}) ->
     Now = maybe_get_param(now, Params, genlib_rfc3339:format(genlib_time:unow(), second)),
     Deployment = maybe_get_param(deployment, Params),
     DeploymentID = maybe_get_param(id, Deployment),
-    ContextFragment#bctx_v1_ContextFragment{
-        env = #bctx_v1_Environment{
+    ContextFragment#ctx_v1_ContextFragment{
+        env = #ctx_v1_Environment{
             now = Now,
-            deployment = maybe_add_param(#bctx_v1_Deployment{id = DeploymentID}, Deployment)
+            deployment = maybe_add_param(#ctx_v1_Deployment{id = DeploymentID}, Deployment)
         }
     }.
 
@@ -114,13 +114,13 @@ make_auth_fragment(Params) ->
     add_auth(Params, empty()).
 
 -spec add_auth(auth_params(), context_fragment()) -> context_fragment().
-add_auth(Params, ContextFragment = #bctx_v1_ContextFragment{auth = undefined}) ->
+add_auth(Params, ContextFragment = #ctx_v1_ContextFragment{auth = undefined}) ->
     Method = get_param(method, Params),
     Scope = maybe_get_param(scope, Params),
     Expiration = maybe_get_param(expiration, Params),
     Token = maybe_get_param(token, Params),
-    ContextFragment#bctx_v1_ContextFragment{
-        auth = #bctx_v1_Auth{
+    ContextFragment#ctx_v1_ContextFragment{
+        auth = #ctx_v1_Auth{
             method = Method,
             scope = maybe_marshal_auth_scopes(Scope),
             expiration = Expiration,
@@ -133,13 +133,13 @@ make_user_fragment(Params) ->
     add_user(Params, empty()).
 
 -spec add_user(user_params(), context_fragment()) -> context_fragment().
-add_user(Params, ContextFragment = #bctx_v1_ContextFragment{user = undefined}) ->
+add_user(Params, ContextFragment = #ctx_v1_ContextFragment{user = undefined}) ->
     UserID = get_param(id, Params),
     RealmEntity = get_param(realm, Params),
     Email = maybe_get_param(email, Params),
     Orgs = maybe_get_param(orgs, Params),
-    ContextFragment#bctx_v1_ContextFragment{
-        user = #bctx_v1_User{
+    ContextFragment#ctx_v1_ContextFragment{
+        user = #ctx_v1_User{
             id = UserID,
             realm = marshal_entity(RealmEntity),
             email = Email,
@@ -152,10 +152,10 @@ make_requester_fragment(Params) ->
     add_requester(Params, empty()).
 
 -spec add_requester(requester_params(), context_fragment()) -> context_fragment().
-add_requester(Params, ContextFragment = #bctx_v1_ContextFragment{requester = undefined}) ->
+add_requester(Params, ContextFragment = #ctx_v1_ContextFragment{requester = undefined}) ->
     IP = maybe_get_param(ip, Params),
-    ContextFragment#bctx_v1_ContextFragment{
-        requester = #bctx_v1_Requester{
+    ContextFragment#ctx_v1_ContextFragment{
+        requester = #ctx_v1_Requester{
             ip = maybe_marshal_ip(IP)
         }
     }.
@@ -166,26 +166,10 @@ get_user_orgs_fragment(UserID, WoodyContext) ->
     ServiceName = org_management,
     case bouncer_client_woody:call(ServiceName, 'GetUserContext', {UserID}, WoodyContext) of
         {ok, EncodedFragment} ->
-            {ok, {encoded_fragment, convert_fragment(ServiceName, EncodedFragment)}};
+            {ok, {encoded_fragment, EncodedFragment}};
         {exception, {'orgmgmt_UserNotFound'}} ->
             {error, {user, notfound}}
     end.
-
-%% As taken from org_management_proto/include/orgmgmt_context_thrift.hrl, please keep in sync:
-%% struct 'ContextFragment'
-%% -record('bctx_ContextFragment', {
-%%     'type' :: atom(),
-%%     'content' :: binary() | undefined
-%% }).
-
-convert_fragment(
-    org_management,
-    {'bctx_ContextFragment', Type = v1_thrift_binary, Content}
-) when is_binary(Content) ->
-    #bctx_ContextFragment{
-        type = Type,
-        content = Content
-    }.
 
 get_param(Key, Map = #{}) ->
     maps:get(Key, Map).
@@ -212,16 +196,16 @@ maybe_add_param(Value, _Param) ->
 
 marshal_entity(Entity) ->
     EntityID = get_param(id, Entity),
-    #bouncer_base_Entity{id = EntityID}.
+    #base_Entity{id = EntityID}.
 
 maybe_marshal_entity(undefined) ->
     undefined;
 maybe_marshal_entity(Entity) ->
     EntityID = maybe_get_param(id, Entity),
-    #bouncer_base_Entity{id = EntityID}.
+    #base_Entity{id = EntityID}.
 
 marshal_token(Token) ->
-    #bctx_v1_Token{id = maybe_get_param(id, Token)}.
+    #ctx_v1_Token{id = maybe_get_param(id, Token)}.
 
 maybe_marshal_auth_scopes(undefined) ->
     undefined;
@@ -229,7 +213,7 @@ maybe_marshal_auth_scopes(Scopes) ->
     ordsets:from_list(lists:map(fun(Scope) -> maybe_marshal_auth_scope(Scope) end, Scopes)).
 
 maybe_marshal_auth_scope(Scope) ->
-    #bctx_v1_AuthScope{
+    #ctx_v1_AuthScope{
         party = maybe_marshal_entity(maybe_get_param(party, Scope)),
         shop = maybe_marshal_entity(maybe_get_param(shop, Scope)),
         invoice = maybe_marshal_entity(maybe_get_param(invoice, Scope)),
@@ -247,7 +231,7 @@ maybe_marshal_user_org(Org) ->
     OwnerEntity = maybe_get_param(owner, Org),
     PartyEntity = maybe_get_param(party, Org),
     Roles = maybe_get_param(roles, Org),
-    #bctx_v1_Organization{
+    #ctx_v1_Organization{
         id = ID,
         owner = maybe_marshal_entity(OwnerEntity),
         party = maybe_marshal_entity(PartyEntity),
@@ -264,10 +248,10 @@ maybe_marshal_user_role(Role) ->
     Scope = maybe_get_param(scope, Role),
     ShopEntity = maybe_get_param(shop, Scope),
 
-    #bctx_v1_OrgRole{
+    #ctx_v1_OrgRole{
         id = ID,
         scope = maybe_add_param(
-            #bctx_v1_OrgRoleScope{
+            #ctx_v1_OrgRoleScope{
                 shop = maybe_add_param(maybe_marshal_entity(ShopEntity), ShopEntity)
             },
             Scope
