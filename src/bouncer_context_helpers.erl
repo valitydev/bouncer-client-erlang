@@ -247,7 +247,6 @@ maybe_marshal_user_role(Role) ->
     ID = maybe_get_param(id, Role),
     Scope = maybe_get_param(scope, Role),
     ShopEntity = maybe_get_param(shop, Scope),
-
     #ctx_v1_OrgRole{
         id = ID,
         scope = maybe_add_param(

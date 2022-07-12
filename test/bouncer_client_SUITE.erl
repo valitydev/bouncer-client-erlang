@@ -390,7 +390,19 @@ validate_complex_fragment(C) ->
     WoodyContext = woody_context:new(),
     ComplexFragment =
         bouncer_context_helpers:add_user(
-            #{id => <<"USER">>, realm => #{id => <<"external">>}, email => <<"user@example.org">>},
+            #{
+                id => <<"USER">>,
+                realm => #{id => <<"external">>},
+                email => <<"user@example.org">>,
+                orgs => [
+                    #{
+                        id => <<"ORG">>,
+                        roles => [
+                            #{id => <<"COMMANDER">>, scope => #{shop => #{id => <<"SHOP">>}}}
+                        ]
+                    }
+                ]
+            },
             bouncer_context_helpers:add_auth(
                 #{method => <<"METHOD">>},
                 bouncer_context_helpers:make_env_fragment(
