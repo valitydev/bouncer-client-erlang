@@ -1,7 +1,8 @@
 -module(bouncer_client).
 
--include_lib("bouncer_proto/include/bouncer_decisions_thrift.hrl").
--include_lib("bouncer_proto/include/bouncer_context_v1_thrift.hrl").
+-include_lib("bouncer_proto/include/bouncer_decision_thrift.hrl").
+-include_lib("bouncer_proto/include/bouncer_ctx_v1_thrift.hrl").
+-include_lib("bouncer_proto/include/bouncer_ctx_thrift.hrl").
 
 %% API
 
@@ -15,7 +16,7 @@
 
 -type context_fragment_id() :: binary().
 -type ruleset_id() :: binary().
--type encoded_context_fragment() :: bouncer_context_thrift:'ContextFragment'().
+-type encoded_context_fragment() :: bouncer_ctx_thrift:'ContextFragment'().
 -type context_fragment() ::
     bouncer_context_helpers:context_fragment()
     | {encoded_fragment, encoded_context_fragment()}.
@@ -24,7 +25,7 @@
     fragments => #{context_fragment_id() => context_fragment()}
 }.
 
--type judgement() :: allowed | forbidden | {restricted, bouncer_restriction_thrift:'Restrictions'()}.
+-type judgement() :: allowed | forbidden | {restricted, bouncer_rstn_thrift:'Restrictions'()}.
 
 -type service_name() :: atom().
 
@@ -53,18 +54,18 @@ judge_(RulesetID, JudgeContext, WoodyContext) ->
     case bouncer_client_woody:call(bouncer, 'Judge', {RulesetID, Context}, WoodyContext) of
         {ok, Judgement} ->
             {ok, parse_judgement(Judgement)};
-        {exception, #bdcs_RulesetNotFound{}} ->
+        {exception, #decision_RulesetNotFound{}} ->
             {error, {ruleset, notfound}};
-        {exception, #bdcs_InvalidRuleset{}} ->
+        {exception, #decision_InvalidRuleset{}} ->
             {error, {ruleset, invalid}};
-        {exception, #bdcs_InvalidContext{}} ->
+        {exception, #decision_InvalidContext{}} ->
             {error, {context, invalid}}
     end.
 
 %%
 
 collect_judge_context(JudgeContext) ->
-    #bdcs_Context{fragments = collect_fragments(JudgeContext, #{})}.
+    #decision_Context{fragments = collect_fragments(JudgeContext, #{})}.
 
 collect_fragments(#{fragments := Fragments}, Context) ->
     maps:fold(fun collect_fragments_/3, Context, Fragments);
@@ -73,16 +74,18 @@ collect_fragments(_, Context) ->
 
 collect_fragments_(FragmentID, {encoded_fragment, EncodedFragment}, Acc0) ->
     Acc0#{FragmentID => EncodedFragment};
-collect_fragments_(FragmentID, ContextFragment = #bctx_v1_ContextFragment{}, Acc0) ->
+collect_fragments_(FragmentID, ContextFragment = #ctx_v1_ContextFragment{}, Acc0) ->
     collect_fragments_(FragmentID, bake_context_fragment(ContextFragment), Acc0).
 
 %%
 
-parse_judgement(#bdcs_Judgement{resolution = {allowed, #bdcs_ResolutionAllowed{}}}) ->
+parse_judgement(#decision_Judgement{resolution = {allowed, #decision_ResolutionAllowed{}}}) ->
     allowed;
-parse_judgement(#bdcs_Judgement{resolution = {forbidden, #bdcs_ResolutionForbidden{}}}) ->
+parse_judgement(#decision_Judgement{resolution = {forbidden, #decision_ResolutionForbidden{}}}) ->
     forbidden;
-parse_judgement(#bdcs_Judgement{resolution = {restricted, #bdcs_ResolutionRestricted{restrictions = Restrictions}}}) ->
+parse_judgement(#decision_Judgement{
+    resolution = {restricted, #decision_ResolutionRestricted{restrictions = Restrictions}}
+}) ->
     {restricted, Restrictions}.
 
 %%
@@ -90,13 +93,13 @@ parse_judgement(#bdcs_Judgement{resolution = {restricted, #bdcs_ResolutionRestri
 -spec bake_context_fragment(bouncer_context_helpers:context_fragment()) ->
     {encoded_fragment, encoded_context_fragment()}.
 bake_context_fragment(ContextFragment) ->
-    {encoded_fragment, #bctx_ContextFragment{
+    {encoded_fragment, #ctx_ContextFragment{
         type = v1_thrift_binary,
         content = encode_context_fragment(ContextFragment)
     }}.
 
 encode_context_fragment(ContextFragment) ->
-    Type = {struct, struct, {bouncer_context_v1_thrift, 'ContextFragment'}},
+    Type = {struct, struct, {bouncer_ctx_v1_thrift, 'ContextFragment'}},
     Codec = thrift_strict_binary_codec:new(),
     case thrift_strict_binary_codec:write(Codec, Type, ContextFragment) of
         {ok, Codec1} ->

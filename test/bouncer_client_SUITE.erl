@@ -3,8 +3,10 @@
 -include_lib("stdlib/include/assert.hrl").
 -include_lib("common_test/include/ct.hrl").
 
--include_lib("bouncer_proto/include/bouncer_decisions_thrift.hrl").
--include_lib("bouncer_proto/include/bouncer_context_v1_thrift.hrl").
+-include_lib("bouncer_proto/include/bouncer_decision_thrift.hrl").
+-include_lib("bouncer_proto/include/bouncer_ctx_v1_thrift.hrl").
+-include_lib("bouncer_proto/include/bouncer_ctx_thrift.hrl").
+-include_lib("bouncer_proto/include/bouncer_base_thrift.hrl").
 
 -export([all/0]).
 
@@ -111,8 +113,8 @@ empty_judge(C) ->
     _ = mock_services(
         [
             {bouncer, fun('Judge', _) ->
-                {ok, #bdcs_Judgement{
-                    resolution = {allowed, #bdcs_ResolutionAllowed{}}
+                {ok, #decision_Judgement{
+                    resolution = {allowed, #decision_ResolutionAllowed{}}
                 }}
             end}
         ],
@@ -139,8 +141,8 @@ follows_timeout(C) ->
         [
             {bouncer, fun('Judge', _) ->
                 ok = timer:sleep(5000),
-                {ok, #bdcs_Judgement{
-                    resolution = {allowed, #bdcs_ResolutionAllowed{}}
+                {ok, #decision_Judgement{
+                    resolution = {allowed, #decision_ResolutionAllowed{}}
                 }}
             end}
         ],
@@ -167,23 +169,23 @@ validate_user_fragment(C) ->
             {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
                 Auth = get_fragment(<<"user">>, Fragments),
                 ?assertEqual(
-                    #bctx_v1_ContextFragment{
-                        user = #bctx_v1_User{
+                    #ctx_v1_ContextFragment{
+                        user = #ctx_v1_User{
                             id = UserID,
-                            realm = #bouncer_base_Entity{id = UserRealm},
+                            realm = #base_Entity{id = UserRealm},
                             orgs = [
-                                #bctx_v1_Organization{
+                                #ctx_v1_Organization{
                                     id = OrgID,
-                                    party = #bouncer_base_Entity{id = PartyID},
-                                    owner = #bouncer_base_Entity{id = UserID}
+                                    party = #base_Entity{id = PartyID},
+                                    owner = #base_Entity{id = UserID}
                                 }
                             ]
                         }
                     },
                     Auth
                 ),
-                {ok, #bdcs_Judgement{
-                    resolution = {allowed, #bdcs_ResolutionAllowed{}}
+                {ok, #decision_Judgement{
+                    resolution = {allowed, #decision_ResolutionAllowed{}}
                 }}
             end}
         ],
@@ -212,12 +214,12 @@ validate_env_fragment(C) ->
             {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
                 case get_time(Fragments) of
                     Time ->
-                        {ok, #bdcs_Judgement{
-                            resolution = {allowed, #bdcs_ResolutionAllowed{}}
+                        {ok, #decision_Judgement{
+                            resolution = {allowed, #decision_ResolutionAllowed{}}
                         }};
                     _ ->
-                        {ok, #bdcs_Judgement{
-                            resolution = {forbidden, #bdcs_ResolutionForbidden{}}
+                        {ok, #decision_Judgement{
+                            resolution = {forbidden, #decision_ResolutionForbidden{}}
                         }}
                 end
             end}
@@ -240,16 +242,16 @@ validate_auth_fragment(C) ->
             {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
                 Auth = get_fragment(<<"auth">>, Fragments),
                 ?assertEqual(
-                    #bctx_v1_ContextFragment{
-                        auth = #bctx_v1_Auth{
+                    #ctx_v1_ContextFragment{
+                        auth = #ctx_v1_Auth{
                             method = Method,
-                            token = #bctx_v1_Token{id = TokenID}
+                            token = #ctx_v1_Token{id = TokenID}
                         }
                     },
                     Auth
                 ),
-                {ok, #bdcs_Judgement{
-                    resolution = {allowed, #bdcs_ResolutionAllowed{}}
+                {ok, #decision_Judgement{
+                    resolution = {allowed, #decision_ResolutionAllowed{}}
                 }}
             end}
         ],
@@ -280,22 +282,22 @@ validate_auth_fragment_scope(C) ->
             {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
                 Auth = get_fragment(<<"auth">>, Fragments),
                 ?assertEqual(
-                    #bctx_v1_ContextFragment{
-                        auth = #bctx_v1_Auth{
+                    #ctx_v1_ContextFragment{
+                        auth = #ctx_v1_Auth{
                             method = Method,
                             scope = [
-                                #bctx_v1_AuthScope{
-                                    invoice_template = #bouncer_base_Entity{id = InvoiceTemplateID},
-                                    customer = #bouncer_base_Entity{id = CustomerID}
+                                #ctx_v1_AuthScope{
+                                    invoice_template = #base_Entity{id = InvoiceTemplateID},
+                                    customer = #base_Entity{id = CustomerID}
                                 },
-                                #bctx_v1_AuthScope{party = #bouncer_base_Entity{id = PartyID}}
+                                #ctx_v1_AuthScope{party = #base_Entity{id = PartyID}}
                             ]
                         }
                     },
                     Auth
                 ),
-                {ok, #bdcs_Judgement{
-                    resolution = {allowed, #bdcs_ResolutionAllowed{}}
+                {ok, #decision_Judgement{
+                    resolution = {allowed, #decision_ResolutionAllowed{}}
                 }}
             end}
         ],
@@ -329,18 +331,18 @@ validate_requester_fragment(C) ->
             {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
                 case get_ip(Fragments) of
                     undefined ->
-                        {ok, #bdcs_Judgement{
-                            resolution = {forbidden, #bdcs_ResolutionForbidden{}}
+                        {ok, #decision_Judgement{
+                            resolution = {forbidden, #decision_ResolutionForbidden{}}
                         }};
                     BinaryIP ->
                         case binary_to_list(BinaryIP) of
                             IP ->
-                                {ok, #bdcs_Judgement{
-                                    resolution = {allowed, #bdcs_ResolutionAllowed{}}
+                                {ok, #decision_Judgement{
+                                    resolution = {allowed, #decision_ResolutionAllowed{}}
                                 }};
                             _ ->
-                                {ok, #bdcs_Judgement{
-                                    resolution = {forbidden, #bdcs_ResolutionForbidden{}}
+                                {ok, #decision_Judgement{
+                                    resolution = {forbidden, #decision_ResolutionForbidden{}}
                                 }}
                         end
                 end
@@ -361,24 +363,24 @@ validate_complex_fragment(C) ->
         [
             {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
                 case Fragments of
-                    #bdcs_Context{fragments = #{<<"complex">> := Fragment}} ->
+                    #decision_Context{fragments = #{<<"complex">> := Fragment}} ->
                         case decode_fragment(Fragment) of
-                            #bctx_v1_ContextFragment{
-                                env = #bctx_v1_Environment{},
-                                auth = #bctx_v1_Auth{},
-                                user = #bctx_v1_User{}
+                            #ctx_v1_ContextFragment{
+                                env = #ctx_v1_Environment{},
+                                auth = #ctx_v1_Auth{},
+                                user = #ctx_v1_User{}
                             } ->
-                                {ok, #bdcs_Judgement{
-                                    resolution = {allowed, #bdcs_ResolutionAllowed{}}
+                                {ok, #decision_Judgement{
+                                    resolution = {allowed, #decision_ResolutionAllowed{}}
                                 }};
                             _ ->
-                                {ok, #bdcs_Judgement{
-                                    resolution = {forbidden, #bdcs_ResolutionForbidden{}}
+                                {ok, #decision_Judgement{
+                                    resolution = {forbidden, #decision_ResolutionForbidden{}}
                                 }}
                         end;
                     _ ->
-                        {ok, #bdcs_Judgement{
-                            resolution = {forbidden, #bdcs_ResolutionForbidden{}}
+                        {ok, #decision_Judgement{
+                            resolution = {forbidden, #decision_ResolutionForbidden{}}
                         }}
                 end
             end}
@@ -388,7 +390,19 @@ validate_complex_fragment(C) ->
     WoodyContext = woody_context:new(),
     ComplexFragment =
         bouncer_context_helpers:add_user(
-            #{id => <<"USER">>, realm => #{id => <<"external">>}, email => <<"user@example.org">>},
+            #{
+                id => <<"USER">>,
+                realm => #{id => <<"external">>},
+                email => <<"user@example.org">>,
+                orgs => [
+                    #{
+                        id => <<"ORG">>,
+                        roles => [
+                            #{id => <<"COMMANDER">>, scope => #{shop => #{id => <<"SHOP">>}}}
+                        ]
+                    }
+                ]
+            },
             bouncer_context_helpers:add_auth(
                 #{method => <<"METHOD">>},
                 bouncer_context_helpers:make_env_fragment(
@@ -408,22 +422,22 @@ validate_remote_user_fragment(C) ->
     _ = mock_services(
         [
             {org_management, fun('GetUserContext', _) ->
-                Content = encode(#bctx_v1_ContextFragment{
-                    user = #bctx_v1_User{
+                Content = encode(#ctx_v1_ContextFragment{
+                    user = #ctx_v1_User{
                         id = UserID
                     }
                 }),
-                {ok, {'bctx_ContextFragment', v1_thrift_binary, Content}}
+                {ok, #ctx_ContextFragment{type = v1_thrift_binary, content = Content}}
             end},
             {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
                 case get_user_id(Fragments) of
                     UserID ->
-                        {ok, #bdcs_Judgement{
-                            resolution = {allowed, #bdcs_ResolutionAllowed{}}
+                        {ok, #decision_Judgement{
+                            resolution = {allowed, #decision_ResolutionAllowed{}}
                         }};
                     _ ->
-                        {ok, #bdcs_Judgement{
-                            resolution = {forbidden, #bdcs_ResolutionForbidden{}}
+                        {ok, #decision_Judgement{
+                            resolution = {forbidden, #decision_ResolutionForbidden{}}
                         }}
                 end
             end}
@@ -436,37 +450,37 @@ validate_remote_user_fragment(C) ->
 
 %%
 
-get_ip(#bdcs_Context{
+get_ip(#decision_Context{
     fragments = #{<<"requester">> := Fragment}
 }) ->
-    #bctx_v1_ContextFragment{requester = #bctx_v1_Requester{ip = IP}} = decode_fragment(Fragment),
+    #ctx_v1_ContextFragment{requester = #ctx_v1_Requester{ip = IP}} = decode_fragment(Fragment),
     IP.
 
-get_time(#bdcs_Context{
+get_time(#decision_Context{
     fragments = #{<<"env">> := Fragment}
 }) ->
-    #bctx_v1_ContextFragment{env = #bctx_v1_Environment{now = Time}} = decode_fragment(Fragment),
+    #ctx_v1_ContextFragment{env = #ctx_v1_Environment{now = Time}} = decode_fragment(Fragment),
     Time.
 
-get_user_id(#bdcs_Context{
+get_user_id(#decision_Context{
     fragments = #{<<"user">> := Fragment}
 }) ->
-    #bctx_v1_ContextFragment{user = #bctx_v1_User{id = UserID}} = decode_fragment(Fragment),
+    #ctx_v1_ContextFragment{user = #ctx_v1_User{id = UserID}} = decode_fragment(Fragment),
     UserID.
 
-get_fragment(ID, #bdcs_Context{fragments = Fragments}) ->
+get_fragment(ID, #decision_Context{fragments = Fragments}) ->
     decode_fragment(maps:get(ID, Fragments)).
 
-decode_fragment(#bctx_ContextFragment{type = v1_thrift_binary, content = Content}) ->
+decode_fragment(#ctx_ContextFragment{type = v1_thrift_binary, content = Content}) ->
     case decode_fragment_content(Content) of
-        Fragment = #bctx_v1_ContextFragment{} ->
+        Fragment = #ctx_v1_ContextFragment{} ->
             Fragment;
         {error, Reason} ->
             error(Reason)
     end.
 
 decode_fragment_content(Content) ->
-    Type = {struct, struct, {bouncer_context_v1_thrift, 'ContextFragment'}},
+    Type = {struct, struct, {bouncer_ctx_v1_thrift, 'ContextFragment'}},
     Codec = thrift_strict_binary_codec:new(Content),
     case thrift_strict_binary_codec:read(Codec, Type) of
         {ok, CtxThrift, Codec1} ->
@@ -481,7 +495,7 @@ decode_fragment_content(Content) ->
     end.
 
 encode(ContextFragment) ->
-    Type = {struct, struct, {bouncer_context_v1_thrift, 'ContextFragment'}},
+    Type = {struct, struct, {bouncer_ctx_v1_thrift, 'ContextFragment'}},
     Codec = thrift_strict_binary_codec:new(),
     case thrift_strict_binary_codec:write(Codec, Type, ContextFragment) of
         {ok, Codec1} ->
@@ -501,9 +515,7 @@ stop_mocked_service_sup(SupPid) ->
 
 -define(APP, bouncer_client).
 -define(HOST_IP, "::").
--define(HOST_PORT, 8080).
 -define(HOST_NAME, "localhost").
--define(HOST_URL, ?HOST_NAME ++ ":" ++ integer_to_list(?HOST_PORT)).
 
 mock_services(Services, SupOrConfig) ->
     maps:map(fun set_cfg/2, mock_services_(Services, SupOrConfig)).
@@ -556,9 +568,9 @@ mock_service_handler(ServiceName, WoodyService, Fun) ->
     {make_path(ServiceName), {WoodyService, {bouncer_client_mock_service, #{function => Fun}}}}.
 
 get_service_modname(org_management) ->
-    {orgmgmt_auth_context_provider_thrift, 'AuthContextProvider'};
+    {orgmgmt_authctx_provider_thrift, 'AuthContextProvider'};
 get_service_modname(bouncer) ->
-    {bouncer_decisions_thrift, 'Arbiter'}.
+    {bouncer_decision_thrift, 'Arbiter'}.
 
 make_url(ServiceName, Port) ->
     iolist_to_binary(["http://", ?HOST_NAME, ":", integer_to_list(Port), make_path(ServiceName)]).
