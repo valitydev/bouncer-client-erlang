@@ -205,7 +205,25 @@ maybe_marshal_entity(Entity) ->
     #base_Entity{id = EntityID}.
 
 marshal_token(Token) ->
-    #ctx_v1_Token{id = maybe_get_param(id, Token)}.
+    TokenAccess = maybe_get_param(access, Token),
+    #ctx_v1_Token{
+        id = maybe_get_param(id, Token),
+        access = maybe(TokenAccess, fun marshal_token_access/1)
+    }.
+
+marshal_token_access(TokenAccess) ->
+    [marshal_resource_access(ResourceAccess) || ResourceAccess <- TokenAccess].
+
+marshal_resource_access(ResourceAccess) ->
+    ID = maybe_get_param(id, ResourceAccess),
+    Roles = maybe_get_param(roles, ResourceAccess),
+    #ctx_v1_ResourceAccess{
+        id = ID,
+        roles = maybe(Roles, fun marshal_token_access_roles/1)
+    }.
+
+marshal_token_access_roles(TokenAccessRoles) when is_list(TokenAccessRoles) ->
+    TokenAccessRoles.
 
 maybe_marshal_auth_scopes(undefined) ->
     undefined;

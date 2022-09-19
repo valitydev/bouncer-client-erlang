@@ -237,6 +237,12 @@ validate_env_fragment(C) ->
 validate_auth_fragment(C) ->
     Method = <<"someMethod">>,
     TokenID = <<"📟"/utf8>>,
+    TokenAccess = [
+        #{
+            id => <<"some-api">>,
+            roles => [<<"do-nothing">>]
+        }
+    ],
     _ = mock_services(
         [
             {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
@@ -245,7 +251,15 @@ validate_auth_fragment(C) ->
                     #ctx_v1_ContextFragment{
                         auth = #ctx_v1_Auth{
                             method = Method,
-                            token = #ctx_v1_Token{id = TokenID}
+                            token = #ctx_v1_Token{
+                                id = TokenID,
+                                access = [
+                                    #ctx_v1_ResourceAccess{
+                                        id = <<"some-api">>,
+                                        roles = [<<"do-nothing">>]
+                                    }
+                                ]
+                            }
                         }
                     },
                     Auth
@@ -264,7 +278,10 @@ validate_auth_fragment(C) ->
             fragments => #{
                 <<"auth">> => bouncer_context_helpers:make_auth_fragment(#{
                     method => Method,
-                    token => #{id => TokenID}
+                    token => #{
+                        id => TokenID,
+                        access => TokenAccess
+                    }
                 })
             }
         },
