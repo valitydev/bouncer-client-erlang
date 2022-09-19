@@ -44,7 +44,13 @@
 }.
 
 -type token() :: #{
-    id => id()
+    id => id(),
+    access => [resource_access()]
+}.
+
+-type resource_access() :: #{
+    id => id(),
+    roles => [binary()]
 }.
 
 -type auth_scope() :: #{
