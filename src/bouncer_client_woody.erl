@@ -11,8 +11,15 @@
     org_management
     | bouncer.
 
+-type transport_opts() :: #{
+    pool := atom(),
+    max_connections => non_neg_integer(),
+    timeout => non_neg_integer()
+}.
+
 -type client_config() :: #{
     url := woody:url(),
+    transport_opts => transport_opts(),
     timeout => non_neg_integer(),
     retries => #{woody:func() | '_' => genlib_retry:strategy()}
 }.
@@ -27,15 +34,12 @@ call(ServiceName, Function, Args, Context) ->
 -spec call(service_name(), woody:func(), woody:args(), context(), woody:ev_handler()) -> woody:result().
 call(ServiceName, Function, Args, Context0, EventHandler) ->
     Config = get_service_client_config(ServiceName),
+    Opts = get_service_client_opts(Config, EventHandler),
     Deadline = get_service_deadline(Config),
     Context1 = set_deadline(Deadline, set_default_deadline(Context0)),
     Retry = get_service_retry(Function, Config),
     Service = get_service_modname(ServiceName),
     Request = {Service, Function, Args},
-    Opts = #{
-        url => get_service_client_url(Config),
-        event_handler => EventHandler
-    },
     call_retry(Request, Context1, Opts, Retry).
 
 call_retry(Request, Context, Opts, Retry) ->
@@ -75,8 +79,13 @@ get_service_client_config(ServiceName) ->
     ServiceClients = genlib_app:env(bouncer_client, service_clients, #{}),
     maps:get(ServiceName, ServiceClients, #{}).
 
-get_service_client_url(ClientConfig) ->
-    maps:get(url, ClientConfig).
+-spec get_service_client_opts(client_config(), woody:ev_handler()) -> woody_client:options().
+get_service_client_opts(#{url := Url} = Config, EventHandler) ->
+    #{
+        url => Url,
+        transport_opts => maps:get(transport_opts, Config, #{}),
+        event_handler => EventHandler
+    }.
 
 -spec get_service_modname(service_name()) -> woody:service().
 get_service_modname(org_management) ->

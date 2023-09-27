@@ -70,6 +70,13 @@ init_per_suite(Config) ->
             {service_clients, #{
                 bouncer => #{
                     url => <<"http://bouncer:8022/">>,
+                    transport_opts => #{
+                        pool => priority,
+                        max_connections => 2000,
+                        %% hackney request timeout
+                        timeout => ?TIMEOUT
+                    },
+                    %% woody_client:context() deadline
                     timeout => ?TIMEOUT,
                     retries => #{
                         'Judge' => ?RETRY_STRATEGY,
