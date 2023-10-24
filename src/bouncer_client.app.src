@@ -9,7 +9,8 @@
         bouncer_proto,
         org_management_proto,
         scoper,
-        woody
+        woody,
+        opentelemetry_api
     ]},
     {env, []},
     {modules, []},
