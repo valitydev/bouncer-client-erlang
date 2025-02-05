@@ -30,7 +30,7 @@
  {<<"ranch">>,{pkg,<<"ranch">>,<<"1.8.0">>},2},
  {<<"scoper">>,
   {git,"https://github.com/valitydev/scoper",
-       {ref,"55a2a32ee25e22fa35f583a18eaf38b2b743429b"}},
+       {ref,"0e7aa01e9632daa39727edd62d4656ee715b4569"}},
   0},
  {<<"snowflake">>,
   {git,"https://github.com/valitydev/snowflake.git",
@@ -39,12 +39,12 @@
  {<<"ssl_verify_fun">>,{pkg,<<"ssl_verify_fun">>,<<"1.1.7">>},2},
  {<<"thrift">>,
   {git,"https://github.com/valitydev/thrift_erlang.git",
-       {ref,"c280ff266ae1c1906fb0dcee8320bb8d8a4a3c75"}},
+       {ref,"3a60e5dc5bbd709495024f26e100b041c3547fd9"}},
   1},
  {<<"unicode_util_compat">>,{pkg,<<"unicode_util_compat">>,<<"0.7.0">>},2},
  {<<"woody">>,
   {git,"https://github.com/valitydev/woody_erlang",
-       {ref,"072825ee7179825a4078feb0649df71303c74157"}},
+       {ref,"cc983a9423325ba1d6a509775eb6ff7ace721539"}},
   0}]}.
 [
 {pkg_hash,[
