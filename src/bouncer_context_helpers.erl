@@ -130,7 +130,7 @@ add_auth(Params, ContextFragment = #ctx_v1_ContextFragment{auth = undefined}) ->
             method = Method,
             scope = maybe_marshal_auth_scopes(Scope),
             expiration = Expiration,
-            token = maybe(Token, fun marshal_token/1)
+            token = 'maybe'(Token, fun marshal_token/1)
         }
     }.
 
@@ -180,9 +180,9 @@ get_user_orgs_fragment(UserID, WoodyContext) ->
 get_param(Key, Map = #{}) ->
     maps:get(Key, Map).
 
-maybe(undefined, _Fun) ->
+'maybe'(undefined, _Fun) ->
     undefined;
-maybe(V, Fun) ->
+'maybe'(V, Fun) ->
     Fun(V).
 
 maybe_get_param(_Key, undefined) ->
@@ -214,7 +214,7 @@ marshal_token(Token) ->
     TokenAccess = maybe_get_param(access, Token),
     #ctx_v1_Token{
         id = maybe_get_param(id, Token),
-        access = maybe(TokenAccess, fun marshal_token_access/1)
+        access = 'maybe'(TokenAccess, fun marshal_token_access/1)
     }.
 
 marshal_token_access(TokenAccess) ->
@@ -225,7 +225,7 @@ marshal_resource_access(ResourceAccess) ->
     Roles = maybe_get_param(roles, ResourceAccess),
     #ctx_v1_ResourceAccess{
         id = ID,
-        roles = maybe(Roles, fun marshal_token_access_roles/1)
+        roles = 'maybe'(Roles, fun marshal_token_access_roles/1)
     }.
 
 marshal_token_access_roles(TokenAccessRoles) when is_list(TokenAccessRoles) ->
