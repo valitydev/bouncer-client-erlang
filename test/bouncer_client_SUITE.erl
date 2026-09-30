@@ -27,6 +27,7 @@
 -export([validate_requester_fragment/1]).
 -export([validate_complex_fragment/1]).
 -export([validate_remote_user_fragment/1]).
+-export([validate_remote_party_fragment/1]).
 
 -type test_case_name() :: atom().
 
@@ -54,7 +55,8 @@ groups() ->
             validate_auth_fragment_scope,
             validate_requester_fragment,
             validate_complex_fragment,
-            validate_remote_user_fragment
+            validate_remote_user_fragment,
+            validate_remote_party_fragment
         ]}
     ].
 
@@ -525,6 +527,38 @@ validate_remote_user_fragment(C) ->
     {ok, EncodedUserFragment} = bouncer_context_helpers:get_user_orgs_fragment(UserID, WoodyContext),
     allowed = bouncer_client:judge(?RULESET_ID, #{fragments => #{<<"user">> => EncodedUserFragment}}, WoodyContext).
 
+-spec validate_remote_party_fragment(config()) -> _.
+validate_remote_party_fragment(C) ->
+    PartyID = <<"someParty">>,
+    _ = mock_services(
+        [
+            {org_management, fun('GetPartyContext', _) ->
+                Content = encode(#ctx_v1_ContextFragment{
+                    party = #ctx_v1_Party{
+                        id = PartyID
+                    }
+                }),
+                {ok, #ctx_ContextFragment{type = v1_thrift_binary, content = Content}}
+            end},
+            {bouncer, fun('Judge', {_RulesetID, Fragments}) ->
+                case get_party_id(Fragments) of
+                    PartyID ->
+                        {ok, #decision_Judgement{
+                            resolution = {allowed, #decision_ResolutionAllowed{}}
+                        }};
+                    _ ->
+                        {ok, #decision_Judgement{
+                            resolution = {forbidden, #decision_ResolutionForbidden{}}
+                        }}
+                end
+            end}
+        ],
+        C
+    ),
+    WoodyContext = woody_context:new(),
+    {ok, EncodedUserFragment} = bouncer_context_helpers:get_party_org_fragment(PartyID, WoodyContext),
+    allowed = bouncer_client:judge(?RULESET_ID, #{fragments => #{<<"party">> => EncodedUserFragment}}, WoodyContext).
+
 %%
 
 get_ip(#decision_Context{
@@ -544,6 +578,12 @@ get_user_id(#decision_Context{
 }) ->
     #ctx_v1_ContextFragment{user = #ctx_v1_User{id = UserID}} = decode_fragment(Fragment),
     UserID.
+
+get_party_id(#decision_Context{
+    fragments = #{<<"party">> := Fragment}
+}) ->
+    #ctx_v1_ContextFragment{party = #ctx_v1_Party{id = PartyID}} = decode_fragment(Fragment),
+    PartyID.
 
 get_fragment(ID, #decision_Context{fragments = Fragments}) ->
     decode_fragment(maps:get(ID, Fragments)).

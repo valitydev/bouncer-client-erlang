@@ -19,7 +19,7 @@
  {<<"opentelemetry_api">>,{pkg,<<"opentelemetry_api">>,<<"1.4.0">>},0},
  {<<"org_management_proto">>,
   {git,"https://github.com/valitydev/org-management-proto",
-       {ref,"a95b1570939d9654b0f8c6573d0eea8c6a804f34"}},
+       {ref,"21db07eb5eeff67e2062e9a02c63db945ec893f6"}},
   0},
  {<<"parse_trans">>,{pkg,<<"parse_trans">>,<<"3.3.1">>},2},
  {<<"prometheus">>,{pkg,<<"prometheus">>,<<"4.8.1">>},1},

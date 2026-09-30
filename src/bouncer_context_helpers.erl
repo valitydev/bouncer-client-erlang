@@ -16,6 +16,7 @@
 -export([add_requester/2]).
 
 -export([get_user_orgs_fragment/2]).
+-export([get_party_org_fragment/2]).
 
 -type id() :: binary().
 -type method() :: binary().
@@ -203,6 +204,17 @@ get_user_orgs_fragment(UserID, WoodyContext) ->
             {ok, {encoded_fragment, EncodedFragment}};
         {exception, {'orgmgmt_UserNotFound'}} ->
             {error, {user, notfound}}
+    end.
+
+-spec get_party_org_fragment(_PartyID :: binary(), woody_context()) ->
+    {ok, bouncer_client:context_fragment()} | {error, {party, notfound}}.
+get_party_org_fragment(PartyID, WoodyContext) ->
+    ServiceName = org_management,
+    case bouncer_client_woody:call(ServiceName, 'GetPartyContext', {PartyID}, WoodyContext) of
+        {ok, EncodedFragment} ->
+            {ok, {encoded_fragment, EncodedFragment}};
+        {exception, {'orgmgmt_PartyNotFound'}} ->
+            {error, {party, notfound}}
     end.
 
 get_param(Key, Map = #{}) ->
