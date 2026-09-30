@@ -10,10 +10,13 @@
 -export([add_auth/2]).
 -export([make_user_fragment/1]).
 -export([add_user/2]).
+-export([make_party_fragment/1]).
+-export([add_party/2]).
 -export([make_requester_fragment/1]).
 -export([add_requester/2]).
 
 -export([get_user_orgs_fragment/2]).
+-export([get_party_org_fragment/2]).
 
 -type id() :: binary().
 -type method() :: binary().
@@ -84,6 +87,17 @@
     shop => entity()
 }.
 
+-type party_params() :: #{
+    id => id(),
+    organization => party_org()
+}.
+
+-type party_org() :: #{
+    id => id(),
+    owner => entity(),
+    allowed_ips => [ip()]
+}.
+
 -type requester_params() :: #{
     ip => ip()
 }.
@@ -138,6 +152,21 @@ add_auth(Params, ContextFragment = #ctx_v1_ContextFragment{auth = undefined}) ->
 make_user_fragment(Params) ->
     add_user(Params, empty()).
 
+-spec make_party_fragment(party_params()) -> context_fragment().
+make_party_fragment(Params) ->
+    add_party(Params, empty()).
+
+-spec add_party(party_params(), context_fragment()) -> context_fragment().
+add_party(Params, ContextFragment = #ctx_v1_ContextFragment{party = undefined}) ->
+    PartyID = get_param(id, Params),
+    PartyOrg = maybe_get_param(organization, Params),
+    ContextFragment#ctx_v1_ContextFragment{
+        party = #ctx_v1_Party{
+            id = PartyID,
+            organization = maybe_marshal_party_org(PartyOrg)
+        }
+    }.
+
 -spec add_user(user_params(), context_fragment()) -> context_fragment().
 add_user(Params, ContextFragment = #ctx_v1_ContextFragment{user = undefined}) ->
     UserID = get_param(id, Params),
@@ -175,6 +204,17 @@ get_user_orgs_fragment(UserID, WoodyContext) ->
             {ok, {encoded_fragment, EncodedFragment}};
         {exception, {'orgmgmt_UserNotFound'}} ->
             {error, {user, notfound}}
+    end.
+
+-spec get_party_org_fragment(_PartyID :: binary(), woody_context()) ->
+    {ok, bouncer_client:context_fragment()} | {error, {party, notfound}}.
+get_party_org_fragment(PartyID, WoodyContext) ->
+    ServiceName = org_management,
+    case bouncer_client_woody:call(ServiceName, 'GetPartyContext', {PartyID}, WoodyContext) of
+        {ok, EncodedFragment} ->
+            {ok, {encoded_fragment, EncodedFragment}};
+        {exception, {'orgmgmt_PartyNotFound'}} ->
+            {error, {party, notfound}}
     end.
 
 get_param(Key, Map = #{}) ->
@@ -281,9 +321,23 @@ maybe_marshal_user_role(Role) ->
         )
     }.
 
+maybe_marshal_party_org(undefined) ->
+    undefined;
+maybe_marshal_party_org(PartyOrg) ->
+    ID = maybe_get_param(id, PartyOrg),
+    OwnerEntity = maybe_get_param(owner, PartyOrg),
+    AllowedIPs = maybe_get_param(allowed_ips, PartyOrg),
+    #ctx_v1_PartyOrganization{
+        id = ID,
+        owner = maybe_marshal_entity(OwnerEntity),
+        allowed_ips = maybe_add_param([maybe_marshal_ip(IP) || IP <- AllowedIPs], AllowedIPs)
+    }.
+
 maybe_marshal_ip(IP) when is_tuple(IP) ->
     list_to_binary(inet:ntoa(IP));
 maybe_marshal_ip(IP) when is_list(IP) ->
     list_to_binary(IP);
+maybe_marshal_ip(IP) when is_binary(IP) ->
+    IP;
 maybe_marshal_ip(undefined) ->
     undefined.
