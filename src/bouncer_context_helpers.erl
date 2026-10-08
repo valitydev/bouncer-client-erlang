@@ -2,6 +2,7 @@
 
 -include_lib("bouncer_proto/include/bouncer_ctx_v1_thrift.hrl").
 -include_lib("bouncer_proto/include/bouncer_base_thrift.hrl").
+-include_lib("org_management_proto/include/orgmgmt_authctx_provider_thrift.hrl").
 
 -export([empty/0]).
 -export([make_env_fragment/1]).
@@ -202,7 +203,7 @@ get_user_orgs_fragment(UserID, WoodyContext) ->
     case bouncer_client_woody:call(ServiceName, 'GetUserContext', {UserID}, WoodyContext) of
         {ok, EncodedFragment} ->
             {ok, {encoded_fragment, EncodedFragment}};
-        {exception, {'orgmgmt_UserNotFound'}} ->
+        {exception, #authctx_provider_UserNotFound{}} ->
             {error, {user, notfound}}
     end.
 
@@ -213,7 +214,7 @@ get_party_org_fragment(PartyID, WoodyContext) ->
     case bouncer_client_woody:call(ServiceName, 'GetPartyContext', {PartyID}, WoodyContext) of
         {ok, EncodedFragment} ->
             {ok, {encoded_fragment, EncodedFragment}};
-        {exception, {'orgmgmt_PartyNotFound'}} ->
+        {exception, #authctx_provider_PartyNotFound{}} ->
             {error, {party, notfound}}
     end.
 

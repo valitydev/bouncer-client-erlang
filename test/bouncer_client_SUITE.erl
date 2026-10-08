@@ -7,6 +7,7 @@
 -include_lib("bouncer_proto/include/bouncer_ctx_v1_thrift.hrl").
 -include_lib("bouncer_proto/include/bouncer_ctx_thrift.hrl").
 -include_lib("bouncer_proto/include/bouncer_base_thrift.hrl").
+-include_lib("org_management_proto/include/orgmgmt_authctx_provider_thrift.hrl").
 
 -export([all/0]).
 
@@ -27,7 +28,9 @@
 -export([validate_requester_fragment/1]).
 -export([validate_complex_fragment/1]).
 -export([validate_remote_user_fragment/1]).
+-export([remote_user_fragment_not_found/1]).
 -export([validate_remote_party_fragment/1]).
+-export([remote_party_fragment_not_found/1]).
 
 -type test_case_name() :: atom().
 
@@ -56,7 +59,9 @@ groups() ->
             validate_requester_fragment,
             validate_complex_fragment,
             validate_remote_user_fragment,
-            validate_remote_party_fragment
+            remote_user_fragment_not_found,
+            validate_remote_party_fragment,
+            remote_party_fragment_not_found
         ]}
     ].
 
@@ -527,6 +532,19 @@ validate_remote_user_fragment(C) ->
     {ok, EncodedUserFragment} = bouncer_context_helpers:get_user_orgs_fragment(UserID, WoodyContext),
     allowed = bouncer_client:judge(?RULESET_ID, #{fragments => #{<<"user">> => EncodedUserFragment}}, WoodyContext).
 
+-spec remote_user_fragment_not_found(config()) -> _.
+remote_user_fragment_not_found(C) ->
+    _ = mock_services(
+        [
+            {org_management, fun orgmanager_stub_with_exceptions/2}
+        ],
+        C
+    ),
+    WoodyContext = woody_context:new(),
+    ?assertEqual(
+        {error, {user, notfound}}, bouncer_context_helpers:get_user_orgs_fragment(<<"someUser">>, WoodyContext)
+    ).
+
 -spec validate_remote_party_fragment(config()) -> _.
 validate_remote_party_fragment(C) ->
     PartyID = <<"someParty">>,
@@ -559,7 +577,26 @@ validate_remote_party_fragment(C) ->
     {ok, EncodedUserFragment} = bouncer_context_helpers:get_party_org_fragment(PartyID, WoodyContext),
     allowed = bouncer_client:judge(?RULESET_ID, #{fragments => #{<<"party">> => EncodedUserFragment}}, WoodyContext).
 
+-spec remote_party_fragment_not_found(config()) -> _.
+remote_party_fragment_not_found(C) ->
+    _ = mock_services(
+        [
+            {org_management, fun orgmanager_stub_with_exceptions/2}
+        ],
+        C
+    ),
+    WoodyContext = woody_context:new(),
+    ?assertEqual(
+        {error, {party, notfound}}, bouncer_context_helpers:get_party_org_fragment(<<"someParty">>, WoodyContext)
+    ).
+
 %%
+
+-spec orgmanager_stub_with_exceptions(atom(), tuple()) -> no_return().
+orgmanager_stub_with_exceptions('GetUserContext', _Args) ->
+    erlang:throw(#authctx_provider_UserNotFound{});
+orgmanager_stub_with_exceptions('GetPartyContext', _Args) ->
+    erlang:throw(#authctx_provider_PartyNotFound{}).
 
 get_ip(#decision_Context{
     fragments = #{<<"requester">> := Fragment}
